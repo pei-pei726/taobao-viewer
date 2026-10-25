@@ -1,0 +1,199 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <meta http-equiv="Content-Style-Type" content="text/css">
+  <title></title>
+  <meta name="Generator" content="Cocoa HTML Writer">
+  <meta name="CocoaVersion" content="2685.6">
+  <style type="text/css">
+    p.p1 {margin: 0.0px 0.0px 0.0px 0.0px; font: 12.0px Times; -webkit-text-stroke: #000000}
+    p.p2 {margin: 0.0px 0.0px 0.0px 0.0px; font: 12.0px Times; -webkit-text-stroke: #000000; min-height: 14.0px}
+    span.s1 {font-kerning: none}
+  </style>
+</head>
+<body>
+<p class="p1"><span class="s1">&lt;!DOCTYPE html&gt;</span></p>
+<p class="p1"><span class="s1">&lt;html lang="zh-TW"&gt;</span></p>
+<p class="p1"><span class="s1">&lt;head&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;meta charset="UTF-8"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;meta name="viewport" content="width=device-width, initial-scale=1.0"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;title&gt;我的淘寶歷史購物清單&lt;/title&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;!-- 引入 Tailwind CSS --&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;script src="https://cdn.tailwindcss.com"&gt;&lt;/script&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;!-- 引入 SheetJS 讀取 Excel/CSV --&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"&gt;&lt;/script&gt;</span></p>
+<p class="p1"><span class="s1">&lt;/head&gt;</span></p>
+<p class="p1"><span class="s1">&lt;body class="bg-gray-50 text-gray-800 min-h-screen p-4 sm:p-8"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;div class="max-w-6xl mx-auto"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;!-- 標題 --&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;header class="mb-8 text-center"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;h1 class="text-3xl font-bold text-orange-600 mb-2"&gt;📦 我的淘寶歷史購物清單&lt;/h1&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;p class="text-gray-500"&gt;智慧去重版：多次上傳新檔案也不怕重複計算&lt;/p&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;/header&gt;</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;!-- 上傳與操作區塊 --&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="bg-white p-6 rounded-xl shadow-md mb-8 border-2 border-dashed border-orange-200 text-center"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;input type="file" id="fileInput" accept=".csv, .xlsx, .xls" class="block w-full max-w-md mx-auto text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-orange-50 file:text-orange-700 hover:file:bg-orange-100 cursor-pointer"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;p class="text-xs text-gray-400 mt-2"&gt;支援多次上傳，系統會自動排除重複的訂單編號&lt;/p&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;div class="mt-4"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>&lt;button id="clearBtn" class="text-xs bg-red-50 text-red-600 px-3 py-1.5 rounded-lg hover:bg-red-100 transition-colors"&gt;🗑️ 清除所有已儲存的資料&lt;/button&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;/div&gt;</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;!-- 統計與搜尋區塊 (預設隱藏) --&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div id="dashboard" class="hidden"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>&lt;div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                    </span>&lt;p class="text-sm text-gray-500"&gt;總訂單筆數&lt;/p&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                    </span>&lt;p id="totalCount" class="text-2xl font-bold text-gray-800"&gt;0&lt;/p&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>&lt;div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                    </span>&lt;p class="text-sm text-gray-500"&gt;總消費金額&lt;/p&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                    </span>&lt;p id="totalAmount" class="text-2xl font-bold text-orange-600"&gt;¥ 0&lt;/p&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;/div&gt;</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;!-- 搜尋框 --&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;div class="mb-6"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>&lt;input type="text" id="searchInput" placeholder="🔍 輸入關鍵字搜尋商品..." class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-orange-500 bg-white"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;/div&gt;</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;!-- 清單表格 --&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;div class="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>&lt;div class="overflow-x-auto"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                    </span>&lt;table class="w-full text-left border-collapse"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                        </span>&lt;thead&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                            </span>&lt;tr class="bg-gray-100 text-gray-600 text-sm border-b border-gray-200"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                                </span>&lt;th class="p-4"&gt;商品圖片&lt;/th&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                                </span>&lt;th class="p-4"&gt;商品名稱與詳情&lt;/th&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                                </span>&lt;th class="p-4"&gt;金額&lt;/th&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                                </span>&lt;th class="p-4"&gt;購買日期&lt;/th&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                            </span>&lt;/tr&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                        </span>&lt;/thead&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                        </span>&lt;tbody id="tableBody" class="divide-y divide-gray-100 text-sm"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                            </span>&lt;!-- 動態填入 --&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                        </span>&lt;/tbody&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                    </span>&lt;/table&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;/div&gt;</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;script&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>let allData = [];</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>window.addEventListener('DOMContentLoaded', function() {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>const savedData = localStorage.getItem('taobao_orders');</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>if (savedData) {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>try {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                    </span>allData = JSON.parse(savedData);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                    </span>if (allData.length &gt; 0) {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                        </span>processData(allData);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                    </span>}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>} catch (e) {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                    </span>console.error('解析儲存的資料失敗', e);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>});</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>document.getElementById('fileInput').addEventListener('change', function(e) {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>const file = e.target.files[0];</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>if (!file) return;</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>const reader = new FileReader();</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>reader.onload = function(e) {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>const data = new Uint8Array(e.target.result);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>const workbook = XLSX.read(data, {type: 'array'});</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>const firstSheetName = workbook.SheetNames[0];</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>const worksheet = workbook.Sheets[firstSheetName];</span></p>
+<p class="p2"><span class="s1"><span class="Apple-converted-space">                </span></span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>const newRows = XLSX.utils.sheet_to_json(worksheet);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>mergeNewData(newRows);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>};</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>reader.readAsArrayBuffer(file);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>this.value = '';</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>});</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>function mergeNewData(newRows) {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>let addedCount = 0;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>const getOrderId = (row) =&gt; String(row['訂單編號'] || row['主訂單編號'] || row['子訂單編號'] || '');</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>const existingIds = new Set(allData.map(row =&gt; getOrderId(row)).filter(id =&gt; id !== ''));</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>newRows.forEach(row =&gt; {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>const orderId = getOrderId(row);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>if (!orderId || !existingIds.has(orderId)) {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                    </span>allData.push(row);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                    </span>if (orderId) existingIds.add(orderId);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                    </span>addedCount++;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>});</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>localStorage.setItem('taobao_orders', JSON.stringify(allData));</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>alert(`成功匯入！本次新增了 ${addedCount} 筆新訂單。`);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>processData(allData);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>document.getElementById('clearBtn').addEventListener('click', function() {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>if (confirm('確定要清除所有已儲存的歷史資料嗎？')) {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>localStorage.removeItem('taobao_orders');</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>allData = [];</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>document.getElementById('dashboard').classList.add('hidden');</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>alert('已清除所有資料！');</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>});</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>function processData(data) {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>if (data.length === 0) return;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>document.getElementById('dashboard').classList.remove('hidden');</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>renderTable(data);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>function renderTable(data) {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>const tbody = document.getElementById('tableBody');</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>tbody.innerHTML = '';</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>let totalSum = 0;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>document.getElementById('totalCount').innerText = `${data.length} 筆`;</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>data.forEach(row =&gt; {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>const title = row['商品標題'] || row['寶貝標題'] || row['商品名稱'] || '未知商品';</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>const price = parseFloat(row['實付款'] || row['單價'] || row['價格'] || 0);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>const date = row['成交時間'] || row['購買時間'] || row['訂單創建時間'] || '-';</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>const imgUrl = row['寶貝圖片'] || row['商品圖片'] || row['圖片'] || '';</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>const itemUrl = row['寶貝鏈接'] || row['商品鏈接'] || row['連結'] || '#';</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>totalSum += isNaN(price) ? 0 : price;</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>const tr = document.createElement('tr');</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>tr.className = 'hover:bg-gray-50 transition-colors';</span></p>
+<p class="p2"><span class="s1"><span class="Apple-converted-space">                </span></span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>tr.innerHTML = `</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                    </span>&lt;td class="p-4 w-20"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                        </span>${imgUrl ? `&lt;img src="${imgUrl}" class="w-16 h-16 object-cover rounded-lg border border-gray-200"&gt;` : '&lt;div class="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center text-xs text-gray-400"&gt;無圖&lt;/div&gt;'}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                    </span>&lt;/td&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                    </span>&lt;td class="p-4"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                        </span>&lt;a href="${itemUrl}" target="_blank" class="font-medium text-gray-800 hover:text-orange-600 line-clamp-2"&gt;${title}&lt;/a&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                    </span>&lt;/td&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                    </span>&lt;td class="p-4 font-semibold text-gray-700 whitespace-nowrap"&gt;¥ ${price.toFixed(2)}&lt;/td&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                    </span>&lt;td class="p-4 text-gray-500 whitespace-nowrap"&gt;${date}&lt;/td&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>`;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>tbody.appendChild(tr);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>});</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>document.getElementById('totalAmount').innerText = `¥ ${totalSum.toFixed(2)}`;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>document.getElementById('searchInput').addEventListener('input', function(e) {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>const keyword = e.target.value.toLowerCase();</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>const filtered = allData.filter(row =&gt; {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>const title = String(row['商品標題'] || row['寶貝標題'] || row['商品名稱'] || '').toLowerCase();</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>return title.includes(keyword);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>});</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>renderTable(filtered);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>});</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;/script&gt;</span></p>
+<p class="p1"><span class="s1">&lt;/body&gt;</span></p>
+<p class="p1"><span class="s1">&lt;/html&gt;</span></p>
+</body>
+</html>
