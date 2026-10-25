@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>淘寶歷史購物清單</title>
+    <!-- 引入 Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入 SheetJS 讀取 Excel/CSV -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head>
+<body class="bg-gray-50 text-gray-800 min-h-screen p-4 sm:p-8">
+    <div class="max-w-6xl mx-auto">
+        <!-- 標題 -->
+        <header class="mb-8 text-center">
+            <h1 class="text-3xl font-bold text-orange-600 mb-2">📦 淘寶歷史購物清單</h1>
+            <p class="text-gray-500">單筆實付金額比例分攤 • 自動補齊編號 • 含台幣換算</p>
+        </header>
+
+        <!-- 上傳與操作區塊 -->
+        <div class="bg-white p-6 rounded-xl shadow-md mb-8 border-2 border-dashed border-orange-200 text-center">
+            <input type="file" id="fileInput" accept=".csv, .xlsx, .xls" class="block w-full max-w-md mx-auto text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-orange-50 file:text-orange-700 hover:file:bg-orange-100 cursor-pointer">
+            <p class="text-xs text-gray-400 mt-2">支援多次上傳與同訂單多商品實付金額分攤，系統會自動排除交易關閉項目</p>
+            
+            <!-- 匯率調整區 -->
+            <div class="mt-4 flex items-center justify-center gap-2 text-sm text-gray-600">
+                <span>人民幣對台幣匯率：</span>
+                <input type="number" id="exchangeRate" value="4.5" step="0.05" class="w-20 px-2 py-1 border border-gray-300 rounded-lg text-center focus:outline-none focus:ring-2 focus:ring-orange-500">
+            </div>
+
+            <div class="mt-4">
+                <button id="clearBtn" class="text-xs bg-red-50 text-red-600 px-3 py-1.5 rounded-lg hover:bg-red-100 transition-colors">🗑️ 清除所有已儲存的資料</button>
+            </div>
+        </div>
+
+        <!-- 統計與搜尋區塊 (預設隱藏) -->
+        <div id="dashboard" class="hidden">
+            <div class="grid grid-cols-2 gap-4 mb-6">
+                <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
+                    <p class="text-sm text-gray-500">有效商品總筆數</p>
+                    <p id="totalCount" class="text-2xl font-bold text-gray-800">0 筆</p>
+                </div>
+                <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
+                    <p class="text-sm text-gray-500">總消費金額 (折合台幣)</p>
+                    <p id="totalAmount" class="text-2xl font-bold text-orange-600">NT$ 0</p>
+                </div>
+            </div>
+
+            <!-- 搜尋框 -->
+            <div class="mb-6">
+                <input type="text" id="searchInput" placeholder="🔍 輸入關鍵字搜尋商品..." class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-orange-500 bg-white">
+            </div>
+
+            <!-- 清單表格 -->
+            <div class="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-gray-50 border-b border-gray-100 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                                <th class="p-4 w-24">商品連結</th>
+                                <th class="p-4">商品名稱與詳情</th>
+                                <th class="p-4 text-center">數量</th>
+                                <th class="p-4 text-right">人民幣 (¥)</th>
+                                <th class="p-4 text-right">台幣 (NT$)</th>
+                                <th class="p-4 text-center">購買日期</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tableBody" class="divide-y divide-gray-100 text-sm">
+                            <!-- 動態插入資料 -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let allOrders = JSON.parse(localStorage.getItem('taobao_orders')) || [];
+
+        const fileInput = document.getElementById('fileInput');
+        const clearBtn = document.getElementById('clearBtn');
+        const dashboard = document.getElementById('dashboard');
+        const totalCount = document.getElementById('totalCount');
+        const totalAmount = document.getElementById('totalAmount');
+        const tableBody = document.getElementById('tableBody');
+        const searchInput = document.getElementById('searchInput');
+        const exchangeRateInput = document.getElementById('exchangeRate');
+
+        if (allOrders.length > 0) {
+            updateUI(allOrders);
+        }
+
+        exchangeRateInput.addEventListener('input', function() {
+            updateUI(allOrders);
+        });
+
+        fileInput.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const firstSheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[firstSheetName];
+                const json = XLSX.utils.sheet_to_json(worksheet);
+
+                processData(json);
+                fileInput.value = ''; 
+            };
+            reader.readAsArrayBuffer(file);
+        });
+
+        clearBtn.addEventListener('click', function() {
+            if (confirm('確定要清除所有已儲存的歷史訂單嗎？')) {
+                allOrders = [];
+                localStorage.removeItem('taobao_orders');
+                dashboard.classList.add('hidden');
+                alert('已清除所有資料！');
+            }
+        });
+
+        searchInput.addEventListener('input', function() {
+            const keyword = this.value.toLowerCase();
+            const filtered = allOrders.filter(order => 
+                (order.title && order.title.toLowerCase().includes(keyword)) ||
+                (order.id && order.id.toLowerCase().includes(keyword))
+            );
+            renderTable(filtered);
+        });
+
+        function processData(json) {
+            const rawOrdersMap = {}; 
+            
+            let lastValidId = '';
+            let lastValidDate = '';
+            let lastValidStatus = '';
+
+            json.forEach(row => {
+                let id = String(row['订单号'] || row['訂單編號'] || '').trim();
+                if (id) {
+                    lastValidId = id;
+                } else {
+                    id = lastValidId;
+                }
+                if (!id) return;
+
+                let date = row['订单提交时间'] || row['訂單提交時間'] || '';
+                if (date) {
+                    lastValidDate = date;
+                } else {
+                    date = lastValidDate;
+                }
+
+                let status = String(row['订单状态'] || row['訂單狀態'] || '');
+                if (status) {
+                    lastValidStatus = status;
+                } else {
+                    status = lastValidStatus;
+                }
+
+                if (status.includes('交易关闭')) return;
+
+                const title = row['商品名称'] || row['商品名稱'] || '未知商品';
+                const link = row['商品链接'] || row['商品連結'] || '#';
+                const quantity = row['商品数量'] || row['商品數量'] || '1';
+
+                let itemAmount = parseFloat(row['商品金额'] || 0);
+                if (isNaN(itemAmount)) itemAmount = 0;
+
+                let rowActualPaid = parseFloat(row['实付金额'] || row['實付款'] || 0);
+                if (isNaN(rowActualPaid)) rowActualPaid = 0;
+
+                if (!rawOrdersMap[id]) {
+                    rawOrdersMap[id] = {
+                        date: date || '-',
+                        actualPaid: 0,
+                        items: []
+                    };
+                }
+
+                // 抓取該訂單唯一的實付金額（只要大於 0 就記錄下來）
+                if (rowActualPaid > 0) {
+                    rawOrdersMap[id].actualPaid = rowActualPaid;
+                }
+
+                rawOrdersMap[id].items.push({
+                    id: id,
+                    title: title,
+                    link: link,
+                    quantity: quantity,
+                    itemAmount: itemAmount,
+                    date: date || '-'
+                });
+            });
+
+            allOrders = [];
+            let newCount = 0;
+
+            for (const id in rawOrdersMap) {
+                const orderGroup = rawOrdersMap[id];
+                const items = orderGroup.items;
+                const totalPaid = orderGroup.actualPaid;
+                const totalItemAmount = items.reduce((sum, item) => sum + item.itemAmount, 0);
+
+                items.forEach(item => {
+                    let finalAmount = 0;
+                    if (totalItemAmount > 0 && totalPaid > 0) {
+                        // 依照商品金額比例分攤該筆訂單唯一的實付金額
+                        finalAmount = (item.itemAmount / totalItemAmount) * totalPaid;
+                    } else if (totalPaid > 0 && items.length === 1) {
+                        finalAmount = totalPaid;
+                    } else {
+                        finalAmount = item.itemAmount;
+                    }
+
+                    allOrders.push({
+                        id: item.id,
+                        title: item.title,
+                        link: item.link,
+                        quantity: item.quantity,
+                        amount: Number(finalAmount.toFixed(2)),
+                        date: item.date
+                    });
+                    newCount++;
+                });
+            }
+
+            localStorage.setItem('taobao_orders', JSON.stringify(allOrders));
+            updateUI(allOrders);
+            alert(`成功匯入！已解析 ${newCount} 筆商品資料（已完成單筆實付金額比例分攤）。`);
+        }
+
+        function updateUI(orders) {
+            if (orders.length === 0) {
+                dashboard.classList.add('hidden');
+                return;
+            }
+
+            dashboard.classList.remove('hidden');
+            totalCount.textContent = `${orders.length} 筆`;
+
+            const rate = parseFloat(exchangeRateInput.value) || 4.5;
+            const totalRMB = orders.reduce((sum, order) => sum + order.amount, 0);
+            const totalTWD = totalRMB * rate;
+            totalAmount.textContent = `NT$ ${Math.round(totalTWD).toLocaleString()}`;
+
+            renderTable(orders);
+        }
+
+        function renderTable(orders) {
+            const rate = parseFloat(exchangeRateInput.value) || 4.5;
+            tableBody.innerHTML = '';
+            orders.forEach(order => {
+                const twdAmount = order.amount * rate;
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-gray-50 transition-colors';
+                tr.innerHTML = `
+                    <td class="p-4">
+                        <a href="${order.link}" target="_blank" class="w-16 h-16 bg-orange-50 rounded-lg flex items-center justify-center text-orange-600 text-xs font-medium hover:bg-orange-100 transition-colors overflow-hidden border border-orange-200">
+                            🔗 前往
+                        </a>
+                    </td>
+                    <td class="p-4">
+                        <a href="${order.link}" target="_blank" class="font-medium text-gray-800 hover:text-orange-600 line-clamp-2">${order.title}</a>
+                        <p class="text-xs text-gray-400 mt-1">訂單編號：${order.id}</p>
+                    </td>
+                    <td class="p-4 text-center text-gray-600">${order.quantity}</td>
+                    <td class="p-4 text-right text-gray-600">¥ ${order.amount.toFixed(2)}</td>
+                    <td class="p-4 text-right font-semibold text-orange-600">NT$ ${Math.round(twdAmount).toLocaleString()}</td>
+                    <td class="p-4 text-center text-xs text-gray-500">${order.date}</td>
+                `;
+                tableBody.appendChild(tr);
+            });
+        }
+    </script>
+</body>
+</html>
