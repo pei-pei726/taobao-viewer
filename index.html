@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>我的淘寶歷史購物清單</title>
+    <!-- 引入 Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入 SheetJS 讀取 Excel/CSV -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head>
+<body class="bg-gray-50 text-gray-800 min-h-screen p-2 sm:p-8">
+    <div class="max-w-6xl mx-auto">
+        <!-- 標題 -->
+        <header class="mb-6 text-center">
+            <h1 class="text-2xl sm:text-3xl font-bold text-orange-600 mb-1">📦 我的淘寶歷史購物清單</h1>
+            <p class="text-xs sm:text-sm text-gray-500">自選分類 (PEI / 亂亂買) • 雲端自動同步中 ☁️</p>
+        </header>
+
+        <!-- 上傳與操作區塊 -->
+        <div class="bg-white p-4 sm:p-6 rounded-xl shadow-md mb-6 border-2 border-dashed border-orange-200 text-center">
+            <input type="file" id="fileInput" accept=".csv, .xlsx, .xls" class="block w-full max-w-md mx-auto text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-orange-50 file:text-orange-700 hover:file:bg-orange-100 cursor-pointer mb-3">
+            <p class="text-xs text-gray-400 mb-3">支援多次上傳與金額運費自動分攤，系統會自動排除交易關閉項目</p>
+            
+            <!-- 匯率調整區 -->
+            <div class="flex items-center justify-center gap-2 text-sm text-gray-600 mb-3">
+                <span>人民幣對台幣匯率：</span>
+                <input type="number" id="exchangeRate" value="4.5" step="0.05" class="w-20 px-2 py-1 border border-gray-300 rounded-lg text-center focus:outline-none focus:ring-2 focus:ring-orange-500">
+            </div>
+
+            <div>
+                <button id="clearBtn" class="text-xs bg-red-50 text-red-600 px-3 py-1.5 rounded-lg hover:bg-red-100 transition-colors">🗑️ 清除雲端所有資料</button>
+            </div>
+        </div>
+
+        <!-- 統計與搜尋區塊 (預設隱藏) -->
+        <div id="dashboard" class="hidden">
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+                <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+                    <p class="text-xs sm:text-sm text-gray-500">有效商品總筆數</p>
+                    <p id="totalCount" class="text-xl sm:text-2xl font-bold text-gray-800">0 筆</p>
+                </div>
+                <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+                    <p class="text-xs sm:text-sm text-gray-500">總消費金額 (含運・台幣)</p>
+                    <p id="totalAmount" class="text-xl sm:text-2xl font-bold text-orange-600">0</p>
+                </div>
+                <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between">
+                    <div>
+                        <p class="text-xs sm:text-sm text-gray-500">分類統計 (台幣)</p>
+                        <p id="categorySummary" class="text-xs sm:text-sm font-semibold text-gray-700 mt-1">PEI: 0 | 亂亂買: 0</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 搜尋與分類篩選列 -->
+            <div class="mb-4 flex flex-col sm:flex-row gap-3">
+                <input type="text" id="searchInput" placeholder="🔍 輸入關鍵字搜尋商品..." class="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-orange-500 bg-white text-sm">
+                <select id="categoryFilter" class="px-4 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-orange-500 bg-white text-gray-600 text-sm">
+                    <option value="ALL">全部分類</option>
+                    <option value="PEI">PEI</option>
+                    <option value="亂亂買">亂亂買</option>
+                </select>
+            </div>
+
+            <!-- 清單表格 (縮小欄寬與間距) -->
+            <div class="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse text-xs sm:text-sm">
+                        <thead>
+                            <tr class="bg-gray-50 border-b border-gray-100 font-semibold text-gray-500 uppercase tracking-wider">
+                                <th class="py-3 px-2 sm:px-4">商品名稱與型號款式</th>
+                                <th class="py-3 px-2 text-center w-16 sm:w-24">分類</th>
+                                <th class="py-3 px-1 text-center w-10 sm:w-16">數量</th>
+                                <th class="py-3 px-2 text-right w-20 sm:w-28">人民幣 (¥)</th>
+                                <th class="py-3 px-2 text-right w-20 sm:w-28">台幣</th>
+                                <th class="py-3 px-2 text-center w-20 sm:w-28">購買日期</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tableBody" class="divide-y divide-gray-100">
+                            <!-- 動態插入資料 -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase 雲端同步核心邏輯 -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/13.1.0/firebase-app.js";
+        import { getFirestore, doc, setDoc, getDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyD9HcDOx1hi7K4AL-HlubEmLo2HiEH7GhI",
+            authDomain: "taboo-viewer.firebaseapp.com",
+            projectId: "taboo-viewer",
+            storageBucket: "taboo-viewer.firebasestorage.app",
+            messagingSenderId: "1021068516261",
+            appId: "1:1021068516261:web:459a135aaf85503979e64c",
+            measurementId: "G-R93D9LLE33"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        let allOrders = [];
+
+        const fileInput = document.getElementById('fileInput');
+        const clearBtn = document.getElementById('clearBtn');
+        const dashboard = document.getElementById('dashboard');
+        const totalCount = document.getElementById('totalCount');
+        const totalAmount = document.getElementById('totalAmount');
+        const categorySummary = document.getElementById('categorySummary');
+        const tableBody = document.getElementById('tableBody');
+        const searchInput = document.getElementById('searchInput');
+        const categoryFilter = document.getElementById('categoryFilter');
+        const exchangeRateInput = document.getElementById('exchangeRate');
+
+        async function loadDataFromCloud() {
+            try {
+                const docRef = doc(db, "taobao", "user_data");
+                const docSnap = await getDoc(docRef);
+                if (docSnap.exists()) {
+                    allOrders = docSnap.data().orders || [];
+                    if (allOrders.length > 0) {
+                        updateUI(allOrders);
+                    }
+                }
+            } catch (err) {
+                console.error("載入雲端資料失敗", err);
+            }
+        }
+        loadDataFromCloud();
+
+        async function saveDataToCloud(orders) {
+            try {
+                await setDoc(doc(db, "taobao", "user_data"), { orders: orders });
+            } catch (err) {
+                console.error("儲存至雲端失敗", err);
+                alert("雲端同步失敗，請檢查網路連線。");
+            }
+        }
+
+        exchangeRateInput.addEventListener('input', function() {
+            updateUI(allOrders);
+        });
+
+        fileInput.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const firstSheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[firstSheetName];
+                const json = XLSX.utils.sheet_to_json(worksheet);
+
+                await processData(json);
+                fileInput.value = ''; 
+            };
+            reader.readAsArrayBuffer(file);
+        });
+
+        clearBtn.addEventListener('click', async function() {
+            if (confirm('確定要清除雲端所有歷史訂單嗎？')) {
+                try {
+                    await deleteDoc(doc(db, "taobao", "user_data"));
+                    allOrders = [];
+                    dashboard.classList.add('hidden');
+                    alert('已清除雲端所有資料！');
+                } catch (err) {
+                    alert('清除失敗');
+                }
+            }
+        });
+
+        searchInput.addEventListener('input', filterAndRender);
+        categoryFilter.addEventListener('change', filterAndRender);
+
+        function filterAndRender() {
+            const keyword = searchInput.value.toLowerCase();
+            const selectedCategory = categoryFilter.value;
+
+            const filtered = allOrders.filter(order => {
+                const matchKeyword = (order.title && order.title.toLowerCase().includes(keyword)) ||
+                                     (order.sku && order.sku.toLowerCase().includes(keyword)) ||
+                                     (order.id && order.id.toLowerCase().includes(keyword));
+                const matchCategory = (selectedCategory === 'ALL' || order.category === selectedCategory);
+                return matchKeyword && matchCategory;
+            });
+            renderTable(filtered);
+        }
+
+        function formatOrderId(val) {
+            if (val === undefined || val === null) return '';
+            let str = String(val).trim();
+            if (str.includes('e') || str.includes('E')) {
+                let num = Number(str);
+                if (!isNaN(num)) {
+                    str = num.toLocaleString('fullwide', { useGrouping: false });
+                }
+            }
+            return str;
+        }
+
+        function parseMoney(val) {
+            if (val === undefined || val === null) return 0;
+            const cleanStr = String(val).replace(/[¥￥,\s]/g, '');
+            const num = parseFloat(cleanStr);
+            return isNaN(num) ? 0 : num;
+        }
+
+        async function processData(json) {
+            const rawOrdersMap = {}; 
+            
+            let lastValidId = '';
+            let lastValidDate = '';
+            let lastValidStatus = '';
+
+            json.forEach(row => {
+                let rawId = row['订单号'] || row['訂單編號'];
+                let id = formatOrderId(rawId);
+                
+                if (id) {
+                    lastValidId = id;
+                } else {
+                    id = lastValidId;
+                }
+                if (!id) return;
+
+                let dateStr = String(row['订单提交时间'] || row['訂單提交時間'] || '').trim();
+                if (dateStr) {
+                    if (dateStr.includes(' ')) {
+                        dateStr = dateStr.split(' ')[0];
+                    }
+                    lastValidDate = dateStr;
+                } else {
+                    dateStr = lastValidDate;
+                }
+
+                let status = String(row['订单状态'] || row['訂單狀態'] || '').trim();
+                if (status) {
+                    lastValidStatus = status;
+                } else {
+                    status = lastValidStatus;
+                }
+
+                if (status.includes('交易关闭')) return;
+
+                const title = String(row['商品名称'] || row['商品名稱'] || '未知商品');
+                const sku = String(row['型号款式'] || row['型號款式'] || '');
+                const link = String(row['商品链接'] || row['商品連結'] || '#');
+                const quantity = String(row['商品数量'] || row['商品數量'] || '1');
+
+                let itemAmount = parseMoney(row['商品金额']);
+                let rowActualPaid = parseMoney(row['实付金额'] || row['實付款']);
+                let rowShipping = parseMoney(row['运费'] || row['運費']);
+
+                if (!rawOrdersMap[id]) {
+                    rawOrdersMap[id] = {
+                        date: dateStr || '-',
+                        actualPaid: 0,
+                        shipping: 0,
+                        items: []
+                    };
+                }
+
+                if (rowActualPaid > 0) {
+                    rawOrdersMap[id].actualPaid = rowActualPaid;
+                }
+                if (rowShipping > 0) {
+                    rawOrdersMap[id].shipping = rowShipping;
+                }
+
+                rawOrdersMap[id].items.push({
+                    id: id,
+                    title: title,
+                    sku: sku,
+                    link: link,
+                    quantity: quantity,
+                    itemAmount: itemAmount,
+                    date: dateStr || '-'
+                });
+            });
+
+            const existingCategoryMap = {};
+            allOrders.forEach(o => {
+                existingCategoryMap[`${o.id}_${o.title}`] = o.category || '亂亂買';
+            });
+
+            allOrders = [];
+            let newCount = 0;
+
+            for (const id in rawOrdersMap) {
+                const orderGroup = rawOrdersMap[id];
+                const items = orderGroup.items;
+                const totalPaid = orderGroup.actualPaid;
+                const totalShipping = orderGroup.shipping;
+                const totalItemAmount = items.reduce((sum, item) => sum + item.itemAmount, 0);
+
+                items.forEach((item, index) => {
+                    let baseAmount = 0;
+                    if (totalItemAmount > 0 && totalPaid > 0) {
+                        baseAmount = (item.itemAmount / totalItemAmount) * totalPaid;
+                    } else if (totalPaid > 0 && items.length === 1) {
+                        baseAmount = totalPaid;
+                    } else {
+                        baseAmount = item.itemAmount;
+                    }
+
+                    let finalAmount = baseAmount;
+                    if (index === 0) {
+                        finalAmount += totalShipping;
+                    }
+
+                    const key = `${item.id}_${item.title}`;
+                    const category = existingCategoryMap[key] || '亂亂買';
+
+                    allOrders.push({
+                        id: item.id,
+                        title: item.title,
+                        sku: item.sku,
+                        link: item.link,
+                        quantity: item.quantity,
+                        amount: Number(finalAmount.toFixed(2)),
+                        date: item.date,
+                        category: category
+                    });
+                    newCount++;
+                });
+            }
+
+            await saveDataToCloud(allOrders);
+            updateUI(allOrders);
+            alert(`成功上傳並同步至雲端！共解析 ${newCount} 筆商品。`);
+        }
+
+        function updateUI(orders) {
+            if (orders.length === 0) {
+                dashboard.classList.add('hidden');
+                return;
+            }
+
+            dashboard.classList.remove('hidden');
+            totalCount.textContent = `${orders.length} 筆`;
+
+            const rate = parseFloat(exchangeRateInput.value) || 4.5;
+            const totalRMB = orders.reduce((sum, order) => sum + order.amount, 0);
+            const totalTWD = totalRMB * rate;
+            totalAmount.textContent = Math.round(totalTWD).toLocaleString();
+
+            let peiTWD = 0;
+            let randomTWD = 0;
+            orders.forEach(order => {
+                const twd = order.amount * rate;
+                if (order.category === 'PEI') {
+                    peiTWD += twd;
+                } else {
+                    randomTWD += twd;
+                }
+            });
+            categorySummary.innerHTML = `PEI: <span class="text-orange-600 font-bold">${Math.round(peiTWD).toLocaleString()}</span> | 亂亂買: <span class="text-orange-600 font-bold">${Math.round(randomTWD).toLocaleString()}</span>`;
+
+            filterAndRender();
+        }
+
+        function renderTable(orders) {
+            const rate = parseFloat(exchangeRateInput.value) || 4.5;
+            tableBody.innerHTML = '';
+            
+            if (orders.length === 0) {
+                tableBody.innerHTML = `<tr><td colspan="6" class="p-6 text-center text-gray-400">沒有找到符合條件的商品</td></tr>`;
+                return;
+            }
+
+            orders.forEach(order => {
+                const twdAmount = order.amount * rate;
+                const skuHtml = order.sku ? `<p class="text-[11px] text-orange-600 mt-0.5 font-medium">型號：${order.sku}</p>` : '';
+
+                const isPei = order.category === 'PEI';
+                const badgeClass = isPei 
+                    ? 'bg-purple-100 text-purple-700 border-purple-200 hover:bg-purple-200' 
+                    : 'bg-blue-100 text-blue-700 border-blue-200 hover:bg-blue-200';
+
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-gray-50 transition-colors';
+                tr.innerHTML = `
+                    <td class="py-2.5 px-2 sm:px-4">
+                        <a href="${order.link}" target="_blank" class="font-medium text-gray-800 hover:text-orange-600 line-clamp-2">${order.title}</a>
+                        ${skuHtml}
+                        <p class="text-[10px] text-gray-400 mt-0.5">單號：${order.id}</p>
+                    </td>
+                    <td class="py-2.5 px-2 text-center">
+                        <button id="btn_${order.id}_${escapeCSSId(order.title)}" onclick="window.toggleCategory('${order.id}', ${JSON.stringify(order.title)})" class="px-2 py-1 rounded-md text-[11px] font-bold border transition-colors ${badgeClass}">
+                            ${order.category}
+                        </button>
+                    </td>
+                    <td class="py-2.5 px-1 text-center text-gray-600">${order.quantity}</td>
+                    <td class="py-2.5 px-2 text-right text-gray-600">¥${order.amount.toFixed(2)}</td>
+                    <td class="py-2.5 px-2 text-right font-semibold text-orange-600">${Math.round(twdAmount).toLocaleString()}</td>
+                    <td class="py-2.5 px-2 text-center text-[11px] text-gray-500 whitespace-nowrap">${order.date}</td>
+                `;
+                tableBody.appendChild(tr);
+            });
+        }
+
+        window.toggleCategory = async function(id, title) {
+            const target = allOrders.find(o => o.id === id && o.title === title);
+            if (target) {
+                target.category = (target.category === 'PEI') ? '亂亂買' : 'PEI';
+                await saveDataToCloud(allOrders);
+                updateUI(allOrders);
+            }
+        }
+
+        function escapeCSSId(str) {
+            return String(str).replace(/([ #;&,\.\+\*\~':"!^$[\]()=>|/])/g, '_');
+        }
+    </script>
+</body>
+</html>
