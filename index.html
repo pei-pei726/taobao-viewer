@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>我的淘寶歷史購物清單</title>
+    <!-- 引入 Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入 SheetJS 讀取 Excel/CSV -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head>
+<body class="bg-gray-50 text-gray-800 min-h-screen p-4 sm:p-8">
+    <div class="max-w-6xl mx-auto">
+        <!-- 標題 -->
+        <header class="mb-8 text-center">
+            <h1 class="text-3xl font-bold text-orange-600 mb-2">📦 我的淘寶歷史購物清單</h1>
+            <p class="text-gray-500">智慧去重版：多次上傳新檔案也不怕重複計算</p>
+        </header>
+
+        <!-- 上傳與操作區塊 -->
+        <div class="bg-white p-6 rounded-xl shadow-md mb-8 border-2 border-dashed border-orange-200 text-center">
+            <input type="file" id="fileInput" accept=".csv, .xlsx, .xls" class="block w-full max-w-md mx-auto text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-orange-50 file:text-orange-700 hover:file:bg-orange-100 cursor-pointer">
+            <p class="text-xs text-gray-400 mt-2">支援多次上傳，系統會自動排除重複的訂單編號</p>
+            <div class="mt-4">
+                <button id="clearBtn" class="text-xs bg-red-50 text-red-600 px-3 py-1.5 rounded-lg hover:bg-red-100 transition-colors">🗑️ 清除所有已儲存的資料</button>
+            </div>
+        </div>
+
+        <!-- 統計與搜尋區塊 (預設隱藏) -->
+        <div id="dashboard" class="hidden">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+                <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
+                    <p class="text-sm text-gray-500">總訂單筆數</p>
+                    <p id="totalCount" class="text-2xl font-bold text-gray-800">0</p>
+                </div>
+                <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
+                    <p class="text-sm text-gray-500">總消費金額</p>
+                    <p id="totalAmount" class="text-2xl font-bold text-orange-600">¥ 0</p>
+                </div>
+            </div>
+
+            <!-- 搜尋框 -->
+            <div class="mb-6">
+                <input type="text" id="searchInput" placeholder="🔍 輸入關鍵字搜尋商品..." class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-orange-500 bg-white">
+            </div>
+
+            <!-- 清單表格 -->
+            <div class="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-gray-100 text-gray-600 text-sm border-b border-gray-200">
+                                <th class="p-4">商品圖片</th>
+                                <th class="p-4">商品名稱與詳情</th>
+                                <th class="p-4">金額</th>
+                                <th class="p-4">購買日期</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tableBody" class="divide-y divide-gray-100 text-sm">
+                            <!-- 動態填入 -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let allData = [];
+
+        window.addEventListener('DOMContentLoaded', function() {
+            const savedData = localStorage.getItem('taobao_orders');
+            if (savedData) {
+                try {
+                    allData = JSON.parse(savedData);
+                    if (allData.length > 0) {
+                        processData(allData);
+                    }
+                } catch (e) {
+                    console.error('解析儲存的資料失敗', e);
+                }
+            }
+        });
+
+        document.getElementById('fileInput').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, {type: 'array'});
+                const firstSheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[firstSheetName];
+                
+                const newRows = XLSX.utils.sheet_to_json(worksheet);
+                mergeNewData(newRows);
+            };
+            reader.readAsArrayBuffer(file);
+            this.value = '';
+        });
+
+        function mergeNewData(newRows) {
+            let addedCount = 0;
+            const getOrderId = (row) => String(row['訂單編號'] || row['主訂單編號'] || row['子訂單編號'] || '');
+            const existingIds = new Set(allData.map(row => getOrderId(row)).filter(id => id !== ''));
+
+            newRows.forEach(row => {
+                const orderId = getOrderId(row);
+                if (!orderId || !existingIds.has(orderId)) {
+                    allData.push(row);
+                    if (orderId) existingIds.add(orderId);
+                    addedCount++;
+                }
+            });
+
+            localStorage.setItem('taobao_orders', JSON.stringify(allData));
+            alert(`成功匯入！本次新增了 ${addedCount} 筆新訂單。`);
+            processData(allData);
+        }
+
+        document.getElementById('clearBtn').addEventListener('click', function() {
+            if (confirm('確定要清除所有已儲存的歷史資料嗎？')) {
+                localStorage.removeItem('taobao_orders');
+                allData = [];
+                document.getElementById('dashboard').classList.add('hidden');
+                alert('已清除所有資料！');
+            }
+        });
+
+        function processData(data) {
+            if (data.length === 0) return;
+            document.getElementById('dashboard').classList.remove('hidden');
+            renderTable(data);
+        }
+
+        function renderTable(data) {
+            const tbody = document.getElementById('tableBody');
+            tbody.innerHTML = '';
+
+            let totalSum = 0;
+            document.getElementById('totalCount').innerText = `${data.length} 筆`;
+
+            data.forEach(row => {
+                const title = row['商品標題'] || row['寶貝標題'] || row['商品名稱'] || '未知商品';
+                const price = parseFloat(row['實付款'] || row['單價'] || row['價格'] || 0);
+                const date = row['成交時間'] || row['購買時間'] || row['訂單創建時間'] || '-';
+                const imgUrl = row['寶貝圖片'] || row['商品圖片'] || row['圖片'] || '';
+                const itemUrl = row['寶貝鏈接'] || row['商品鏈接'] || row['連結'] || '#';
+
+                totalSum += isNaN(price) ? 0 : price;
+
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-gray-50 transition-colors';
+                
+                tr.innerHTML = `
+                    <td class="p-4 w-20">
+                        ${imgUrl ? `<img src="${imgUrl}" class="w-16 h-16 object-cover rounded-lg border border-gray-200">` : '<div class="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center text-xs text-gray-400">無圖</div>'}
+                    </td>
+                    <td class="p-4">
+                        <a href="${itemUrl}" target="_blank" class="font-medium text-gray-800 hover:text-orange-600 line-clamp-2">${title}</a>
+                    </td>
+                    <td class="p-4 font-semibold text-gray-700 whitespace-nowrap">¥ ${price.toFixed(2)}</td>
+                    <td class="p-4 text-gray-500 whitespace-nowrap">${date}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            document.getElementById('totalAmount').innerText = `¥ ${totalSum.toFixed(2)}`;
+        }
+
+        document.getElementById('searchInput').addEventListener('input', function(e) {
+            const keyword = e.target.value.toLowerCase();
+            const filtered = allData.filter(row => {
+                const title = String(row['商品標題'] || row['寶貝標題'] || row['商品名稱'] || '').toLowerCase();
+                return title.includes(keyword);
+            });
+            renderTable(filtered);
+        });
+    </script>
+</body>
+</html>
